@@ -1,0 +1,18 @@
+# Local builds and Python caches
+*.app/
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+venv/
+
+# Local project output and machine-specific shortcuts
+Finished Projects
+.local-builder/
+.builder*
+*.log
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
