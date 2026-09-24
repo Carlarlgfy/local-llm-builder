@@ -19,6 +19,8 @@ The test exposed and fixed a builder issue: Node needs metadata access to exact 
 
 ## Highest-priority rough edges
 
+Latest polish: 30 application tests pass. The UI shows elapsed inference time and clearer timeout/invalid-response messages; Resume can retry an interrupted planning stage. Language-tool status refreshes, and reopen uses the native in-window folder picker. Immediate inference cancellation is still unfinished.
+
 1. **Independent acceptance checks:** the same model currently writes implementation and tests. Keep requirements separate, detect omitted requirements and weakened assertions, and add visual/browser checks with explicit user review.
 2. **Model reliability:** benchmark several installed coding models; smaller models can ignore interfaces, dependencies, and units. Add an editable task preview and a vetted set of small project templates.
 3. **Failure classification:** distinguish missing tools, sandbox failures, invalid model JSON, inference timeout, and implementation bugs. Do not spend model repair attempts on an environment failure.
