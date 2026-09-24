@@ -1,0 +1,18 @@
+# Optional GitHub Actions template. Copy to .github/workflows/ to enable
+# using a GitHub credential authorized to write workflow files.
+name: Portable project checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  portable:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest discover -s tests -p test_projects.py -v

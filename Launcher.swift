@@ -2,6 +2,19 @@ import Cocoa
 import WebKit
 import PDFKit
 
+if CommandLine.arguments.contains("--choose-folder") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.canCreateDirectories = true
+    panel.allowsMultipleSelection = false
+    app.activate(ignoringOtherApps: true)
+    if panel.runModal() == .OK { print(panel.url!.path) }
+    exit(0)
+}
+
 if CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--extract-pdf" {
     if let document = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[2])) {
         for i in 0..<document.pageCount { print(document.page(at: i)?.string ?? "") }
@@ -10,7 +23,7 @@ if CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--extract-pd
     exit(1)
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply {
     var window: NSWindow!
     var process: Process!
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -39,7 +52,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate {
         }
         let data = pipe.fileHandleForReading.availableData
         guard let address = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), let url = URL(string: address) else { NSApp.terminate(nil); return }
-        let web = WKWebView(frame: .zero)
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "chooseFolder")
+        let web = WKWebView(frame: .zero, configuration: configuration)
         web.uiDelegate = self
         window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 1150,height: 840), styleMask: [.titled,.closable,.miniaturizable,.resizable], backing: .buffered,defer: false)
         window.title = "AI Builder"
@@ -47,6 +62,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate {
         window.center(); window.makeKeyAndOrderFront(nil)
         web.load(URLRequest(url: url))
         NSApp.activate(ignoringOtherApps: true)
+    }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
+        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "127.0.0.1" else {
+            replyHandler(nil, "Folder selection is only available to AI Builder."); return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.canCreateDirectories = true; panel.allowsMultipleSelection = false
+        panel.beginSheetModal(for: window) { result in
+            replyHandler(["folder": result == .OK ? (panel.url?.path ?? "") : ""], nil)
+        }
     }
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = false; panel.canChooseDirectories = false

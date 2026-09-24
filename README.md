@@ -21,24 +21,44 @@ Double-click **AI Builder.app**. Keep LM Studio's local server running on port 1
 
 1. Drop a PDF, Word document, Markdown file, or text file into the window. You can also choose a file or paste a plan.
 2. Select your local coding model. The default is `qwen2.5-coder` when available.
-3. Click **Start build**. The app creates a new project under **Documents / AI Builder Projects**.
+3. Enter a project name, choose a destination folder, and click **Start build**. The default is **Documents / AI Builder Projects**. Existing folders are never overwritten.
 4. Follow the task list and activity log. Each task gets up to three generation/test attempts. Passing tasks get Git checkpoints; all collected checks run again at the end.
-5. Click **Run project** or **Open folder**. Python output appears in Activity; static HTML opens in your browser.
+5. Use **Test project**, **Run project**, **Run in Terminal**, **Open folder**, or **Open in VS Code**. C and Python output appears in Activity; Terminal supports interactive input; static HTML opens in your browser.
 6. Describe a change in **Make a change** and click **Apply change**. Existing files are included in the model context and prior recorded checks run again.
 
 Use **Pause / Resume** between model calls or commands, and **Stop** to cancel further work. A running inference request may take up to five minutes to return; a running test process is terminated promptly. Keep the app open while building.
 
-To continue an older project, paste its folder path into **Reopen a project folder**. Files, task results, logs, and Git history are saved locally. An interrupted build can be continued through a change request describing what remains. Exact task-level crash resume is not implemented.
+To continue an older project, choose it from **Recent projects** or use **Browse**. **Resume build** skips saved passing tasks, retries unfinished work, and reruns the recorded checks. Task results, logs, and Git history stay in the project. If interruption happened between a file edit and its checkpoint, that unfinished task is retried; individual commands are not replayed transactionally.
+
+## Move the result to Linux or another Mac
+
+Use **Export source ZIP** after checks pass. Extract it on the other computer, open its folder in VS Code, and run:
+
+```sh
+python3 project.py build
+python3 project.py test
+python3 project.py run
+```
+
+The exported source includes a command manifest (`project.json`), portable helper (`project.py`), build report, and `HOW_TO_RUN.md`. C artifacts are rebuilt on the destination machine; Mac executables are not Linux executables. Install Python 3 and the language's toolchain there. The standalone helper executes reviewed project commands with ordinary account permissions, not the builder sandbox.
+
+GitHub is optional. You may upload the generated source to a separate repository and clone it on your Linux laptop, or transfer the ZIP directly. The builder itself remains a macOS application. Source portability is intended; a successful Mac build does not certify Linux compatibility.
 
 ## Supported scope
 
-This desktop release supports **C programs**, **Python standard-library applications**, and **static HTML/CSS/JavaScript websites**. It generates runnable projects, not signed installers or universally portable executables. GUI frameworks, package installation, full-stack deployments, scanned-PDF OCR, automatic rollback UI, and arbitrary external tools are not included. For projects with dependencies, install and review those separately.
+The strongest tested paths are **C programs and libraries**, **Python standard-library applications**, and small static websites (which still need human visual checks). Fifteen language profiles are available: C, C++, Python, JavaScript, TypeScript, Rust, Go, Java, C#, Swift, Kotlin, Ruby, PHP, Lua and R. Profiles report missing tools; they do not install them or certify framework support. C++, JavaScript, Swift and Ruby have local runtime smoke checks; missing toolchains remain unverified. C# needs a prepared offline restore environment.
+
+It generates runnable source projects, not signed installers or universally portable executables. GUI frameworks, automatic package installation, full-stack deployments, scanned-PDF OCR, and automatic rollback UI are not included. Read **EXPERIMENT CHECKLIST.md** for current limitations and the assisted Sky Hopper trial. The **Planning Guide** folder contains the detailed planning handoff and reusable prompt.
 
 ## Building entirely in C
 
 Specify “Implement the entire project in C11, including tests” in your plan, or drop in **Try C.md**. The agent generates `.c` and `.h` files, compiles with the installed Apple Clang compiler, executes C assertion tests, and launches the resulting executable with **Run project**. C source and headers remain available to the model during follow-up edits. Compiler errors and failing test executables feed into the repair loop.
 
 Use commands such as `clang -std=c11 -Wall -Wextra main.c -o app`, then `./app`. Commands execute separately without shell expansion; list source files explicitly. The `cc` and `gcc` names are mapped to Apple Clang on this Mac. The generated executable targets this Mac; cross-compilation and automatic external-library installation are not provided. The builder itself still uses its existing Python service and native Mac launcher.
+
+For a reusable static library, try **Try C Library.md**. The app supports compiling `.o` files, archiving them with `ar rcs`, linking consumer programs, and running their tests. Under **C libraries and dependencies**, you can import a small local source folder (including its license) into `vendor/`. You can also list already-installed `pkg-config` library names; the compiler and portable helper resolve their build/link flags. Missing dependencies are reported before starting. Standard system libraries can be linked directly in the plan. Large library trees, downloading libraries, and package-manager installation are not automated.
+
+Compilation failures stop the entire check sequence. A native executable is accepted as a check only if it was built earlier in the same sequence. Run Project rebuilds recorded compile commands first, so edits do not silently launch an old executable. Export requires a matching source fingerprint from successful checks.
 
 Text PDFs are supported through macOS PDFKit. Word import extracts text, not embedded graphics. Plans are limited to 10 MB and 60,000 extracted characters. Current project context is limited to 100,000 characters. Model quality and speed depend on the loaded model and hardware.
 
@@ -55,6 +75,10 @@ The app requires this Mac's existing `/opt/homebrew/bin/python3`, macOS framewor
 - Real LM Studio `qwen2.5-coder` build: temperature converter, unit tests, Git checkpoints, final verification.
 - Real follow-up: Kelvin conversion added; expanded tests passed.
 - Automated checks cover imports, HTTP authentication, path traversal, sandbox network/write denial, protected Git metadata, and the earlier planner.
+- Portable library tests build a static archive, link a consumer, export only source, move it to another folder, then rebuild and test it there.
+- Recovery tests cover unfinished-task resume, repair feedback, and stale-binary rejection.
+
+The portable tests run locally on macOS. Linux execution has not been performed here. `ci/portable-projects.yml` is an optional macOS/Linux GitHub Actions template; it is not enabled automatically.
 
 Run developer tests from this folder:
 

@@ -1,5 +1,7 @@
 # AI Builder polish roadmap
 
+> September 24 update: the current readiness assessment is **EXPERIMENT CHECKLIST.md**. The older backlog below is retained for planning; destination/name selection, recent projects, resume, portable manifests, source ZIP export and language profiles have since been implemented. They still need broader user testing. The application suite currently has 27 passing tests; the game trial required direct assistance.
+
 ## Product target
 
 Open one app, drop in a project plan, choose a destination, click Build, and receive a clearly named folder containing working software, instructions, tests, and a launch action. Reopen that project later, describe changes, and confidently return to a previous working version when needed.
