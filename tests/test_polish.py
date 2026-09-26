@@ -1,4 +1,6 @@
 import json
+import io
+import urllib.error
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,3 +35,25 @@ class PolishTests(unittest.TestCase):
             code,out=app.sandbox_command(root,['node','test.cjs'])
             self.assertEqual(code,0,out)
             self.assertIn('isolated',out)
+    def model_response(self,message,finish='stop'):
+        return io.BytesIO(json.dumps({'choices':[{'message':message,'finish_reason':finish}]}).encode())
+    def test_complete_reasoning_prefix_is_not_treated_as_code(self):
+        response=self.model_response({'content':'<think>local draft</think>\n{"tasks": []}'})
+        with patch('urllib.request.urlopen',return_value=response):
+            self.assertEqual(app.model_json('example','Return tasks'),{'tasks':[]})
+    def test_structured_generation_disables_reasoning_budget(self):
+        response=self.model_response({'content':'{"tasks": []}'})
+        with patch('urllib.request.urlopen',return_value=response) as opened:
+            app.model_json('example','Return tasks')
+        payload=json.loads(opened.call_args.args[0].data)
+        self.assertEqual(payload['reasoning_effort'],'none')
+    def test_empty_or_truncated_answer_is_rejected(self):
+        for content,finish in [('', 'stop'),('{"tasks":[]}', 'length')]:
+            with self.subTest(finish=finish),patch('urllib.request.urlopen',return_value=self.model_response({'content':content},finish)):
+                with self.assertRaisesRegex(RuntimeError,'response budget'):
+                    app.model_json('example','Return tasks')
+    def test_context_rejection_has_specific_recovery_advice(self):
+        error=urllib.error.HTTPError('http://127.0.0.1',400,'Bad Request',{},io.BytesIO(b'{"error":"context length exceeded"}'))
+        with patch('urllib.request.urlopen',side_effect=error):
+            with self.assertRaisesRegex(RuntimeError,'context/output limits'):
+                app.model_json('example','Return tasks')

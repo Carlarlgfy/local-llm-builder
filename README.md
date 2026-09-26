@@ -19,16 +19,29 @@ The build creates an app bundle with its icon and an ad-hoc local signature. It 
 
 Double-click **AI Builder.app**. Keep LM Studio's local server running on port 1234.
 
-1. Drop a PDF, Word document, Markdown file, or text file into the window. You can also choose a file or paste a plan.
-2. Select your local coding model. The default is `qwen2.5-coder` when available.
-3. Enter a project name, choose a destination folder, and click **Start build**. The default is **Documents / AI Builder Projects**. Existing folders are never overwritten.
-4. Follow the task list and activity log. Each task gets up to three generation/test attempts. Passing tasks get Git checkpoints; all collected checks run again at the end.
-5. Use **Test project**, **Run project**, **Run in Terminal**, **Open folder**, or **Open in VS Code**. C and Python output appears in Activity; Terminal supports interactive input; static HTML opens in your browser.
-6. Describe a change in **Make a change** and click **Apply change**. Existing files are included in the model context and prior recorded checks run again.
+1. Choose **Create a new project folder**, **Work inside an existing code folder**, or **Clone a Git repository**.
+2. For a new project, explicitly choose its output location. For existing code, choose the exact code folder; existing Git projects must have a clean working tree. Non-Git folders receive a local repository and recovery checkpoint.
+3. Drop a PDF, Word document, Markdown file, or text file into the window. You can also choose a file or paste a plan.
+4. Select your local coding model and click **Start build**. The app will not start until the applicable folder has been selected.
+5. Follow the task list and activity log. Batch mode gives each task up to three generation/test attempts. Experimental tool-loop mode allows up to 30 small model/tool turns per task. Passing tasks get Git checkpoints; all collected checks run again at the end.
+6. Use **Test project**, **Run project**, **Run in Terminal**, **Open folder**, or **Open in VS Code**. C and Python output appears in Activity; Terminal supports interactive input; static HTML opens in your browser.
+7. Describe a change in **Make a change** and click **Apply change**. Existing files are included in the model context and prior recorded checks run again.
+
+Optionally enter an HTTPS or SSH Git repository address before starting. After every task and check passes, **Push verified branch** uploads the current verified commit to a new `ai-builder/...` branch. It never pushes automatically or directly to `main`. Authentication comes from the Mac's existing SSH key or Git credential manager; repository URLs containing credentials are rejected.
+
+Clone mode uses the same repository address and requires an explicitly selected output location. Private repositories require existing GitHub authentication. **Restore passing checkpoint** first preserves the current state on a local `ai-builder-recovery/...` branch, then restores the last passing commit.
 
 Use **Pause / Resume** between model calls or commands, and **Stop** to cancel further work. A running inference request may take up to five minutes to return; a running test process is terminated promptly. Keep the app open while building.
 
+Each generated attempt is first applied and tested in an isolated disposable workspace. The real project receives the files only after that attempt passes; failed attempts are discarded. The accepted files are then tested again in the real project before checkpointing.
+
 To continue an older project, choose it from **Recent projects** or use **Browse**. **Resume build** skips saved passing tasks, retries unfinished work, and reruns the recorded checks. Task results, logs, and Git history stay in the project. If interruption happened between a file edit and its checkpoint, that unfinished task is retried; individual commands are not replayed transactionally.
+
+## Experimental local tool loop
+
+Select **Tool loop — experimental, local-model tests** under Build method. Load a tool-capable model first; the current experiment uses Qwen3.5 35B A3B at 32,768 context. The local model reads and writes individual files, receives real check failures and repairs its own code. All generated implementation and test source comes from that local model. No manual solution is supplied to make a trial pass.
+
+Start with [the small trial plan](Improvements/TRY%20LOCAL%20TOOL%20LOOP.md). See [implementation, safety boundaries and remaining work](Improvements/TOOL%20LOOP%20IMPLEMENTATION.md). This uses internal tools, not an external MCP transport or bundled Cline/Continue agent. Tool-loop projects cannot use the app-owned Sky Hopper checker; use a plain plan without its profile marker. Tests written by the implementing model still need review.
 
 ## Move the result to Linux or another Mac
 
@@ -71,6 +84,8 @@ Inference goes only to `127.0.0.1:1234`. Generated command execution uses macOS 
 The app requires this Mac's existing `/opt/homebrew/bin/python3`, macOS frameworks, and system Git. The application contains its service/UI resources and can be moved as a unit. It is locally signed, not notarized for general distribution.
 
 ## Validation
+
+**Independent game checks:** `Try Sky Hopper.md` now selects a two-stage, app-owned acceptance profile. It checks pure physics and simulated UI controls without letting the coding model replace or skip the checker. See **INDEPENDENT CHECKS.md** for exact coverage and limits, and **RELIABILITY TRIAL.md** for real-model results. Other plans still use model-written tests. Simulated UI checks do not replace a real-browser play test.
 
 - Real LM Studio `qwen2.5-coder` build: temperature converter, unit tests, Git checkpoints, final verification.
 - Real follow-up: Kelvin conversion added; expanded tests passed.

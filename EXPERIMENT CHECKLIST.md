@@ -4,7 +4,7 @@
 
 1. Open **AI Builder.app** from your Desktop.
 2. In LM Studio, load a coding model and enable the local server on port 1234.
-3. Enter a project name and choose **Save new projects in** before starting. The builder creates a new named folder and never overwrites an existing one.
+3. Choose where the builder works: create a new named project inside an explicitly selected output folder, or apply the plan directly inside a selected existing code folder. Existing Git folders must be clean before starting.
 4. Drop a short plan into the app. Start with a small utility or the supplied example plans.
 5. After checks pass, use **Open folder**, **Test project**, and **Run project**. Inspect the result yourself before trusting it.
 6. Reopen a project from the recent list to request changes. Use **Export source ZIP** to move reviewed source to another computer.
@@ -18,6 +18,8 @@ The playable game is in `Documents/AI Builder Projects/Sky Hopper`. Double-click
 The test exposed and fixed a builder issue: Node needs metadata access to exact ancestor directories to resolve files. Other user-folder contents remain denied. The destination picker now opens as a sheet in the main window.
 
 ## Highest-priority rough edges
+
+New reliability pass: Sky Hopper has independent app-owned checks, a fixed two-stage contract, no-progress detection, more specific model-response errors, and stricter verified-export gating. Read **INDEPENDENT CHECKS.md** and **RELIABILITY TRIAL.md** before interpreting this as autonomous reliability. This profile does not cover arbitrary apps.
 
 Latest polish: 30 application tests pass. The UI shows elapsed inference time and clearer timeout/invalid-response messages; Resume can retry an interrupted planning stage. Language-tool status refreshes, and reopen uses the native in-window folder picker. Immediate inference cancellation is still unfinished.
 

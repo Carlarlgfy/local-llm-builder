@@ -2,7 +2,9 @@
 
 ## Handoff guide for a planning LLM and AI Builder
 
-Version 0.3 planning contract | 24 September 2026
+Version 0.4 planning contract | 25 September 2026
+
+This revision incorporates the local Sky Hopper failures: context exhaustion, incompatible interfaces, ineffective repairs, and incomplete UI verification. The improvement backlog is in Improvements/LOCAL MODEL IMPROVEMENT PLAN.md. Proposed capabilities there are not promises about the current app.
 
 Give this guide and your idea to the LLM that will write your project plan. Its job is to produce one self-contained, executable plan for AI Builder. Save that resulting plan as Markdown, a text-based PDF, Word, or plain text and drop it into the app. Do not use this general guide itself as the project to build.
 
@@ -72,17 +74,18 @@ AI Builder is a macOS desktop app. It sends the plan to an LM Studio model on lo
 ### What the planner must assume
 
 - The desktop importer accepts readable PDF, DOCX text, Markdown, and text. Prefer selectable text, normal headings, and code blocks. Scanned PDFs need OCR first; embedded images are not sufficient specifications.
-- Plans must be at most 10 MB and 60,000 extracted characters. Current source context is limited to 100,000 characters. Keep the project small enough to fit with tests and imported source.
+- Plans must be at most 10 MB and 60,000 extracted characters. Generic source context is limited to 100,000 characters; individual files of 60,000 bytes or more are currently omitted. These are importer limits, NOT safe model token budgets. The loaded context must also fit instructions, source, rejected drafts, diagnostics and output. Keep projects substantially smaller; do not assume omitted code is visible.
 - The model sees the plan, current task, relevant supported text files, and failure feedback. Never rely on an earlier chat, an unattached reference, or a link the local model would have to fetch.
 - Execution is sequential. Each task gets at most three generation/check attempts. A failed compile stops subsequent checks. Native test binaries must be compiled in that check sequence before they run.
 - Commands run without a shell, with no network access, within the chosen project workspace. Specify token arrays or simple separate commands. No wildcard expansion, shell redirects, package installs, or downloads.
 - Normal check commands have a 60-second limit; running the completed program in-app has a 300-second limit. Prefer fast tests. Interactive input belongs in Run in Terminal, not automated checks.
 - The app creates parent directories for declared build outputs. Keep compiled artifacts in build/. Do not put source files in build/, dist/, target/, bin/, or obj/ because exports exclude those generated directories.
-- A stopped build preserves files and passing task records. Resume skips saved passing tasks and retries unfinished work. The final check pass is still required.
+- Drafts are checked in a temporary workspace before application to the project. Passing changes are checked again and checkpointed. This is not yet a crash-proof multi-file transaction.
+- A stopped build preserves files and passing task records. Resume skips saved passing tasks and retries unfinished work. The final check pass is still required. Do not assume edits to passed work are automatically replanned on resume.
 
 ### Application-owned files
 
-Do not ask the coding agent to create or overwrite project.py, project.json, START.command, HOW_TO_RUN.md, BUILD_REPORT.md, .gitignore, PROJECT_PLAN.md, .git/, or .builder* state. The app owns those files. Ask it to write the project's README.md and normal source/tests instead.
+Do not ask the coding agent to create or overwrite project.py, project.json, START.command, HOW_TO_RUN.md, BUILD_REPORT.md, .gitignore, PROJECT_PLAN.md, .git/, or .builder* state. The app owns those files. ACCEPTANCE.cjs is also protected when using the Sky Hopper profile. Ask it to write the project's README.md and normal source/tests instead.
 
 ### Libraries and external assets
 
@@ -116,6 +119,12 @@ List each source/test file and its responsibility. Define module boundaries and 
 
 List allowed libraries and where they come from. Prefer local deterministic fixtures. Declare network requirements separately; the current build/test sandbox has no network. Do not include real credentials. Describe any manual installation prerequisite before the build.
 
+## Workspace and local-only policy
+
+First specify workspace mode (new project, existing code folder, or Git clone), the selected destination, files to preserve and baseline tests. Existing Git folders must be clean. A GitHub address alone is not permission to push: access, local Git authentication and an explicit upload action are also needed. Git transfers use the network separately from inference.
+
+State whether the requirement is local inference only or fully offline operation. For fully local-generated software, require all new and repaired implementation files, including HTML/CSS/UI bindings, to come from the installed local model. No cloud coding fallback or silent assistant-written repairs. Disclose existing source, app-owned launchers and acceptance tests separately. An externally authored plan is not local-generated planning.
+
 ## Ordered tasks
 
 Use stable IDs T1, T2, and so on. Each task names dependencies, files it may change, behavior to implement, checks, expected evidence, and a stop condition. Keep each task self-contained: code, tests, and verification belong together. Never leave a task consisting only of an empty header or placeholder UI.
@@ -126,7 +135,7 @@ Map R1...Rn to automated tests or named manual checks. Include fresh build comma
 
 ### Make quality measurable
 
-Replace “fast,” “secure,” “beautiful,” and “works well” with examples or thresholds. For instance: reject malformed input without crashing; preserve existing data on validation failure; complete a 1,000-record local test within a measured target; show an empty-state message; provide keyboard-accessible controls. Avoid performance claims without measuring on the target machine.
+Replace vague quality claims with testable outcomes: reject malformed input, preserve data on failure, show an empty state, and support keyboard controls. Measure performance on the target machine before claiming a speed target is met.
 
 <!-- page -->
 
@@ -175,6 +184,68 @@ The current application supplies bounded retries and checkpoints. These planning
 
 <!-- page -->
 
+# Local-model planning rules learned from actual failures
+
+## Budget for a repair, not only the first answer
+
+Record the model identifier, actual loaded context and available toolchain before a run. The trials used 8,192-token loaded contexts even where the installed model supported more. A larger advertised maximum does not provide more room until the model is loaded with that setting. Increasing context also needs a measured memory/latency check; it is not a correctness fix.
+
+The current builder requests up to 10,000 output tokens without automatic input/output budgeting. Leave room for the original task, a rejected draft, diagnostics and the answer. Split work before filling the window. Token estimation and adaptive output limits are proposed improvements, not current guarantees.
+
+Keep each task to one cohesive behavior and a small file set, often 1-4 files. Supply the active requirement, exact interface, required source and concrete checks. Avoid repeating the entire architecture in every task. Do not ask the coding response for a long essay or reasoning transcript. The builder owns its response schema; the planner supplies requirements, not an alternative tool protocol.
+
+## Define contracts that a small model can follow
+
+For each shared API, specify exact names, arguments, return type, mutation versus copying, units, initial state, valid transitions, error behavior and invariants. Give numerical boundary examples where ambiguity changes the result. Separate public behavior from implementation style. Do not invent helper functions outside the shared API.
+
+For a game: say whether dt is seconds, whether touching an edge counts as collision, whether scoring occurs before or after collision, which coordinate is compared, and whether reset preserves the high score. For a data app: specify missing/duplicate values, ordering, validation failures and whether failed writes preserve old data.
+
+After an interface passes, integration tasks should consume it, not rewrite it. Explicitly list editable files and protected dependencies. Generic per-task allowlists and interface enforcement are still roadmap items; plan instructions alone are not a security boundary.
+
+## Specify UI behavior as a separate deliverable
+
+List initial, loading, active, paused, error and completed states as relevant. For each control, state the event, allowed starting state, effect, displayed result and persistence behavior. Include keyboard repeat, duplicate event handling, restart/reopen, unavailable storage, and a single animation loop if animated.
+
+Define real-browser review: load without console errors, use every control, resize, use the keyboard, reload and verify saved data. A simulated DOM test does not prove a visible or usable interface. Include local images/styles/scripts and explicitly prohibit remote assets for offline projects.
+
+<!-- page -->
+
+# Acceptance, repair and truthful completion
+
+## Keep requirements separate from implementation
+
+For each requirement, record: ID, input/action, expected result, automated/manual check, and check owner. Builder-owned checks should not be editable by the coding model. Use intentionally broken fixtures to prove important checks fail. Compilation, an empty test run and a model's success message are not correctness evidence.
+
+Only the narrow sky-hopper-v1 profile currently provides the app-owned game gate. Other projects use model-written checks and need independently reviewed acceptance evidence. Adding requirement IDs to a document does not create a general independent verifier.
+
+If using "Acceptance profile: sky-hopper-v1", the fixed contract in local_builder/acceptance.py controls both stages. Do not request conflicting physics or interfaces. Specialized prompts do not forward arbitrary additions from the imported plan; use a generic plan or implement a new profile for different requirements. A profile passing does not prove custom requirements were implemented.
+
+## Use a structured repair description
+
+```text
+Requirement: R3
+Failing check: exact command and test name
+Input/state: smallest reproducible case
+Expected: exact behavior or value
+Actual: observed result and diagnostic
+Allowed changes: task-owned implementation files
+Preserve: public API, passed behavior, acceptance tests
+Verify: failed check, then complete regression suite
+Stop: missing prerequisite or unresolved contradiction
+```
+
+Distinguish invalid/truncated output, missing tools, inference failure, sandbox rejection, test-harness bugs and implementation defects. An environment failure is not evidence that rewriting source helps. The current app has some tailored messages but not a complete failure classifier.
+
+Three implementation attempts is the current ceiling per task. Identical rejected code and diagnostic should stop; changed code with the same remaining failure should not automatically count as identical. Never relax acceptance to obtain a green result. Change a faulty checker only with recorded evidence of intended behavior and rerun affected results.
+
+## Completion labels and provenance
+
+Request separate labels: incomplete; automated checks passed; manual review pending; reviewed. The current app UI may use simpler labels. Also report locally generated, existing/imported, app-supplied or externally repaired file origins separately from test results.
+
+For an entirely local-generated claim, request model ID, local endpoint, run ID, hashes tied to accepted model responses, checker version/hash, final checks and manual review. Source now contains initial response logging and per-file hashes; an end-to-end provenance verifier is still needed. Missing evidence is unknown provenance, not proof of local authorship. A working assisted demo is not an autonomous benchmark.
+
+<!-- page -->
+
 # Reusable request for the planning LLM
 
 Copy the following request and attach this guide. Replace the bracketed fields with your idea and environment details. The result should be the project-specific plan, not implementation code and not a discussion of how planning works.
@@ -189,6 +260,11 @@ Target computers: [macOS/Linux and known CPU architectures]
 Available compilers/runtimes: [copy the app's tool status]
 Allowed dependencies: [standard library/local source/installed]
 Important constraints: [offline, performance, data, UI, budget]
+Workspace: [new folder / existing folder / Git clone]
+Existing behavior to preserve: [files, tests, baseline]
+Local policy: [local inference / entirely offline]
+Loaded model/context: [actual instance and context, or unknown]
+Optional Git destination: [address; upload requires approval]
 
 First check that the project fits the builder's actual scope.
 Do not assume unsupported packages, tools, GUI frameworks,
@@ -204,11 +280,20 @@ Return a ready-to-save Markdown plan with these sections:
 6. Ordered tasks T1...Tn, normally 1-3 complete increments.
 7. Final acceptance checks, manual checks, and limitations.
 8. How to build, test, run, and move the source to Linux.
+9. Workspace boundaries, local-only policy and provenance.
 
 For every task include dependencies, requirement IDs, exact
 files, implementation steps, test commands, expected results,
 preserved behavior, failure recovery, and a stop condition.
 Every task must leave useful behavior with executable tests.
+Keep task context compact; reserve space for repair output.
+Specify boundary cases, units, state transitions and mutation.
+For UI work include event behavior and real-browser review.
+Separate independent acceptance from model-written tests.
+Do not claim roadmap features are currently enforced.
+For local-generated implementation, forbid cloud fallback
+and externally written source repairs; disclose existing
+code and app-supplied infrastructure separately.
 
 Use explicit command argument arrays. Compile native tests
 before running them. Do not use shell chaining or wildcards.
@@ -296,7 +381,9 @@ python3 project.py run
 
 Install the necessary runtime/compiler and approved dependencies on the destination first. Open the same folder in VS Code with File > Open Folder. Source exports omit build outputs, internal state, obvious secrets, and Git history; review the archive before sharing it. The portable helper uses normal user permissions, not the builder sandbox.
 
-## Final planning review checklist
+<!-- page -->
+
+# Final planning review checklist
 
 - Every requirement has a test or an explicit manual review step.
 - Interfaces, units, filenames, task order, and commands agree.
@@ -307,6 +394,11 @@ Install the necessary runtime/compiler and approved dependencies on the destinat
 - Existing behavior must be preserved during changes; failed builds cannot use stale output.
 - Portability assumptions and untested platforms are disclosed.
 - The plan fits the prototype's size, execution, and retry limits.
+- Actual loaded context leaves space for rejected drafts and complete repair output.
+- Workspace boundaries, local inference/offline policy and upload permission are explicit.
+- Every UI state and critical boundary has a concrete expected result.
+- Fixed profile constraints do not contradict custom requirements.
+- Code provenance and independent/manual verification are separately reported.
 
 ## Sources for language guidance
 

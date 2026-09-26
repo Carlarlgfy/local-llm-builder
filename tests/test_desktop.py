@@ -39,6 +39,36 @@ class DesktopTests(unittest.TestCase):
             for path in ('../secret','/etc/passwd','.git/config','.builder.json'):
                 with self.assertRaises(ValueError): app.path_in(Path(d),path)
 
+    def test_existing_workspace_requires_clean_git_or_initializes_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)/'code';root.mkdir();(root/'main.py').write_text('print(1)')
+            self.assertEqual(app.prepare_existing_workspace(str(root)),root.resolve())
+            self.assertTrue((root/'.git').is_dir())
+            self.assertIn('.builder*',(root/'.git/info/exclude').read_text())
+            (root/'main.py').write_text('print(2)')
+            with self.assertRaisesRegex(ValueError,'uncommitted Git changes'):
+                app.prepare_existing_workspace(str(root))
+
+    def test_existing_workspace_rejects_builder_project_and_broad_folder(self):
+        with self.assertRaisesRegex(ValueError,'specific project folder'):
+            app.prepare_existing_workspace(str(Path.home()))
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'.builder.json').write_text('{}')
+            with self.assertRaisesRegex(ValueError,'Continue a project'):
+                app.prepare_existing_workspace(str(root))
+
+    def test_git_remote_validation_rejects_credentials_and_unsafe_schemes(self):
+        self.assertEqual(app.validate_git_remote('git@github.com:owner/repo.git'),'git@github.com:owner/repo.git')
+        self.assertEqual(app.validate_git_remote('https://github.com/owner/repo.git'),'https://github.com/owner/repo.git')
+        for value in ('file:///tmp/repo','https://user:secret@example.com/repo.git','not a repository'):
+            with self.subTest(value=value),self.assertRaises(ValueError): app.validate_git_remote(value)
+
+    def test_clone_requires_remote_and_destination(self):
+        with self.assertRaisesRegex(ValueError,'repository address'):
+            app.clone_workspace('',tempfile.gettempdir(),'Clone')
+        with self.assertRaisesRegex(ValueError,'where the repository'):
+            app.clone_workspace('https://github.com/owner/repo.git','/path/that/does/not/exist','Clone')
+
     def test_execution_is_sandboxed(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

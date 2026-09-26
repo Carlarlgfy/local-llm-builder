@@ -8,7 +8,7 @@ import tempfile
 import zipfile
 from .project_runner import validate_command, is_build, build_outputs, build_directories
 
-MANAGED = {'project.py','project.json','START.command','HOW_TO_RUN.md','BUILD_REPORT.md'}
+MANAGED = {'project.py','project.json','START.command','HOW_TO_RUN.md','BUILD_REPORT.md','ACCEPTANCE.cjs'}
 COMPILERS = {'clang','cc','gcc'}
 
 def new_folder(destination, name):
@@ -79,6 +79,9 @@ def write_handoff(root, state):
               'build':build,'test':tests,'launch':state.get('launch',[]),
               'libraries':state.get('libraries',[]),'build_outputs':outputs,
               'build_directories':sorted({directory for command in build for directory in build_directories(command)}),
+              'acceptance_profile':state.get('acceptance_profile'),
+              'acceptance_suite_sha256':state.get('acceptance_suite_sha256'),
+              'manual_review':'Required: visual appearance and real-browser play test.',
               'validated_on':'macOS','linux_validation':'Not run; rebuild and test on Linux.'}
     # Reject symlinks before writing application-managed handoff files.
     for name in MANAGED:
@@ -111,6 +114,9 @@ project.json contains the recorded build/test/run commands. The portable helper 
 This project was checked on macOS. Linux compatibility is intended but must be tested on your Linux computer. Model-written tests cannot prove every requirement is correct.
 ''')
     (root/'BUILD_REPORT.md').write_text('# Build report\n\nStatus: '+state.get('status','Unknown')+'\n\nSource fingerprint: '+fingerprint(root)+'\n\nPlatform checked: macOS\n\nRecorded checks:\n\n'+''.join('- `'+json.dumps(c)+'`\n' for c in checks)+'\nReview the README and try the actual behavior. Linux testing has not been performed by the local builder.\n')
+    if state.get('acceptance_profile'):
+        with (root/'BUILD_REPORT.md').open('a') as report:
+            report.write('\nIndependent profile: '+state['acceptance_profile']+'\n\nApp-owned tests check physics and simulated UI events. They do not certify visual quality, real-browser compatibility, accessibility, or enjoyable gameplay. Manual review remains required.\n')
     return manifest
 
 def export_project(root, target_dir=None):
